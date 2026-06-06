@@ -1,0 +1,35 @@
+{
+  "summary": "Iteration 3 — Validated the new canonical supplier search contract POST /api/v1/suppliers/aliexpress/search end-to-end, plus license/dashboard/maintenance refresh, CORS preflight for the three production-class origins, plugin release pointing at updates.nipsdownloads.com, and full regression of iterations 1-2. 59/59 tests pass (21 new + 38 legacy). Verbatim query passthrough (with spaces, ampersand, uppercase) is byte-for-byte correct. Full rich payload contract (32 top-level fields + supplier object + meta + variants) verified on every result item.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/v1/suppliers/aliexpress/search", "issue": "limit=0 silently falls back to default 18 (does not clamp to 1) because `req.limit or 18` treats 0 as falsy. Production spec only mandates the 1-60 upper clamp so this is acceptable, but a stricter implementation would use `max(1, min(int(req.limit), 60))` after validating presence."}
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter3_supplier_contract.py",
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_iter3.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py is ~1060 lines — still single-file; consider splitting into routers/ (discovery, suppliers, imports, ai, publish, maintenance) before adding more modules.",
+    "REACT_APP_BACKEND_URL in /app/frontend/.env points at the user's PROD cloud (api.nipsdownloads.com), NOT the Emergent backend. This is intentional per the user's contract-mirroring goal, but means the prototype frontend running in Emergent will hit production. Confirm this is what the user wants; otherwise the frontend will not exercise the canonical Emergent backend.",
+    "`int(req.limit or 18)` in suppliers_aliexpress_search treats 0 as missing — minor but worth a comment or explicit handling.",
+    "compute_meta() synthesises orders as `feedback_count * 2.4` — fine as a heuristic but worth documenting that `orders` in the v1 contract is NOT a real supplier count.",
+    "`shipping_to` is accepted but never used to filter the catalog (only echoed back). The contract docstring should call this out so the production cloud mirrors the same behaviour.",
+    "CORS: when CORS_ORIGINS env is unset the code falls back to ['*'] AND sets allow_credentials=False, which is correct. But the production allow-list (dropshipping.nips.live, alloutspares.com, api/updates.nipsdownloads.com) is only applied when CORS_ORIGINS is explicitly set to a non-* value. Recommend defaulting to the explicit list in production builds."
+  ],
+  "updated_files": [
+    "/app/backend/tests/backend_test.py (plan Pro→Business, latest release 2.9.6→2.9.8, BASE_URL override when REACT_APP_BACKEND_URL is the prod cloud)",
+    "/app/backend/tests/test_iter3_supplier_contract.py (new — 21 tests)"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "not tested (backend-only per request)"},
+  "test_credentials": "None required — these routes have no auth. EMERGENT_LLM_KEY already in /app/backend/.env was used for the real OpenAI gpt-5.2 rewrite test.",
+  "seed_data_creation": "None — mock_data.py catalog is sufficient. All test-created drafts are cleaned up in the regression tests.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend URL note: REACT_APP_BACKEND_URL is intentionally pointed at api.nipsdownloads.com (user's production). For Emergent backend contract tests use https://product-forge-61.preview.emergentagent.com directly (the test files now do this automatically — they detect api.nipsdownloads.com and switch). Coverage now spans: discovery v0 (/api/discovery/search), supplier v1 (/api/v1/suppliers/aliexpress/search), imports CRUD, AI rewrite (real OpenAI), publish, logs, releases, maintenance, smart-sort/filter, CORS preflight, plan/license/cloud envelope. Use existing test_iter3_supplier_contract.py for v1 contract regression on any future cloud-mirroring work.",
+  "rca of the issue": "No issues found. All 21 iteration-3 contract assertions pass: verbatim query echo, 32-field rich payload, supplier object, variants shape, exact-URL detection (exact_match=true, count=1), shipping_from='CN' strict filter and ALL/any/blank wildcard equivalence, platform='shopee' → HTTP 400, limit clamp to 60, search history persisted with endpoint='v1.suppliers.aliexpress.search', license plan=Business + key NIPS-ADMIN-LICENSE-0001 + domain alloutspares.com, dashboard cloud.endpoint=api.nipsdownloads.com / version=2.9.8-prototype, maintenance lists all 6 targets, v2.9.8 latest release with download URL on updates.nipsdownloads.com, CORS preflight returns Access-Control-Allow-Origin echoing each of the three tested origins."
+}

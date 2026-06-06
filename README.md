@@ -174,7 +174,9 @@ docker run -d --name nips-mongo -p 27017:27017 mongo:7
 | DELETE | `/api/logs` | — | Clear logs |
 | GET | `/api/v1/plugin/releases` | — | **Mock** release list |
 | GET | `/api/v1/plugin/releases/latest` | — | **Mock** latest release |
+| GET | `/api/maintenance` | — | List available maintenance targets + descriptions |
 | POST | `/api/maintenance/clear` | `?target=history\|drafts\|cache\|logs\|all` | Maintenance |
+| POST | `/api/v1/suppliers/aliexpress/search` | `{query, platform, shipping_from, shipping_to, sort, limit}` | **Canonical supplier search** — verbatim query, full rich payload. Production path: `POST /v1/suppliers/aliexpress/search` (no `/api` prefix) on `api.nipsdownloads.com`. See `HANDOFF.md` §3 for complete request/response contract. |
 
 Full payload shapes: hit any endpoint and inspect, or see `/app/backend/server.py`.
 

@@ -126,6 +126,20 @@ class PublishRequest(BaseModel):
     publish_mode: str = "draft"  # draft | simple | variable | isolated_variants
 
 
+class SupplierSearchRequest(BaseModel):
+    """Contract for POST /api/v1/suppliers/aliexpress/search.
+
+    Mirror this exact request schema on the production cloud at
+    https://api.nipsdownloads.com/v1/suppliers/aliexpress/search.
+    """
+    query: str = Field(..., description="Verbatim user-typed query — never rewrite")
+    platform: str = "aliexpress"
+    shipping_from: str = "ALL"
+    shipping_to: str = "any"
+    sort: str = "best_score"
+    limit: int = 18
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 #  AliExpress URL detection
 # ──────────────────────────────────────────────────────────────────────────────
@@ -302,7 +316,7 @@ async def dashboard_stats():
     return {
         "license": {
             "status": "active",
-            "plan": "Pro",
+            "plan": "Business",
             "key": "NIPS-ADMIN-LICENSE-0001",
             "expires_at": "2099-12-31",
         },
@@ -323,10 +337,14 @@ async def dashboard_stats():
 
 @api.get("/license/status")
 async def license_status():
+    key = "NIPS-ADMIN-LICENSE-0001"
     return {
-        "key": "NIPS-ADMIN-LICENSE-0001",
+        "key": key,
+        "key_last4": key.split("-")[-1],
+        "key_masked": f"NIPS-•••-{key.split('-')[-1]}",
         "valid": True,
-        "plan": "Pro",
+        "plan": "Business",
+        "plan_label": "Business",
         "domain": "alloutspares.com",
         "issued_at": "2026-01-12",
         "expires_at": "2099-12-31",
@@ -391,6 +409,176 @@ async def discovery_search(req: SearchRequest):
         "exact_match": exact is not None,
         "count": len(results),
         "results": results,
+    }
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  Supplier Search v1 — canonical contract for production
+#  PROD URL : POST https://api.nipsdownloads.com/v1/suppliers/aliexpress/search
+#  EMERGENT : POST /api/v1/suppliers/aliexpress/search (Emergent ingress = /api/*)
+# ──────────────────────────────────────────────────────────────────────────────
+def flatten_supplier_product(p: dict) -> dict:
+    """Flatten the rich product payload into the v1 supplier-search shape.
+
+    Every field listed in the production spec is exposed at the top level,
+    plus a nested `supplier` object and a `meta` block with the smart score.
+    """
+    meta = p.get("meta", {}) or {}
+    supplier = p.get("supplier", {}) or {}
+    shipping = p.get("shipping", {}) or {}
+
+    variants = []
+    for v in p.get("variants", []) or []:
+        variants.append({
+            "variant_id": v.get("variant_id"),
+            "sku": v.get("sku"),
+            "title": v.get("title"),
+            "image": v.get("image"),
+            "price": v.get("price"),
+            "retail_price": v.get("retail_price"),
+            "attributes": v.get("attributes", {}),
+            "stock": v.get("stock"),
+        })
+
+    return {
+        # ── Identity ──
+        "product_id": p.get("product_id"),
+        "sku": p.get("sku"),
+        "title": p.get("title"),
+        "product_url": p.get("supplier_url"),
+        "supplier_url": p.get("supplier_url"),
+        # ── Pricing ──
+        "price": p.get("price"),
+        "retail_price": p.get("retail_price"),
+        "profit_estimate": p.get("profit_estimate"),
+        "profit_pct": meta.get("profit_pct"),
+        "currency": p.get("currency"),
+        # ── Categorisation ──
+        "category": p.get("category"),
+        "tags": p.get("tags", []),
+        # ── Images ──
+        "main_image": p.get("main_image"),
+        "gallery_images": p.get("gallery_images", []),
+        "description_images": p.get("description_images", []),
+        # ── Content ──
+        "description": p.get("description"),
+        "specifications": p.get("specifications", []),
+        "attributes": p.get("attributes", []),
+        # ── Variants ──
+        "variants": variants,
+        # ── Shipping (flat fields per spec) ──
+        "shipping_method": shipping.get("method"),
+        "shipping_price": shipping.get("price"),
+        "shipping_from": shipping.get("from_country"),
+        "shipping_to": shipping.get("to_country"),
+        "estimated_delivery": shipping.get("estimated_delivery"),
+        "has_shipping": shipping.get("has_shipping"),
+        "free_shipping": meta.get("free_shipping"),
+        # ── Trust / sales (top-level) ──
+        "rating": supplier.get("rating") or meta.get("rating"),
+        "orders": meta.get("orders"),
+        "stock": p.get("stock"),
+        # ── Supplier object ──
+        "supplier": {
+            "name": supplier.get("name"),
+            "store_url": supplier.get("store_url"),
+            "rating": supplier.get("rating"),
+            "feedback_count": supplier.get("feedback_count"),
+            "country": supplier.get("country"),
+        },
+        # ── Smart score + raw meta ──
+        "meta": meta,
+    }
+
+
+def _normalize_shipping_filter(code: str) -> str:
+    """Treat 'ALL' / 'any' / '' / None as wildcard."""
+    if not code:
+        return ""
+    c = code.strip().upper()
+    if c in ("ALL", "ANY"):
+        return ""
+    return c
+
+
+@api.post("/v1/suppliers/aliexpress/search")
+async def suppliers_aliexpress_search(req: SupplierSearchRequest):
+    # CRITICAL: query is sent through verbatim. No rewriting, no trimming.
+    query = req.query
+
+    if req.platform.lower() != "aliexpress":
+        raise HTTPException(400, f"Unsupported platform: {req.platform}")
+
+    # Auto-detect mode from the verbatim query
+    if URL_RE.match(query) and ("aliexpress.com" in query.lower() or "/item/" in query.lower()):
+        mode = "url"
+    elif PURE_DIGITS.match(query.strip()):
+        mode = "sku"
+    else:
+        mode = "name"
+
+    raw_results: list[dict] = []
+    exact = None
+    if mode == "url":
+        product = find_by_url(query)
+        if product:
+            exact = product
+            raw_results = [product]
+    elif mode == "sku":
+        product = find_by_id(query.strip())
+        if product:
+            exact = product
+            raw_results = [product]
+        else:
+            raw_results = search_keyword(query)
+    else:
+        raw_results = search_keyword(query)
+
+    # Optional shipping_from filter (ALL/any/blank = wildcard)
+    ship_from = _normalize_shipping_filter(req.shipping_from)
+    if ship_from:
+        raw_results = [
+            p for p in raw_results
+            if (p.get("shipping", {}).get("from_country") or "").upper() == ship_from
+        ]
+    # shipping_to is informational in the prototype catalog (mostly US).
+    # The flag is passed back in the response so clients can echo it.
+
+    sort_by = req.sort if req.sort in SORT_OPTIONS else "best_score"
+    enriched = apply_sort_and_filters(
+        raw_results, sort_by=sort_by, filter_free=False, filter_min_reviews=0
+    )
+
+    limit = max(1, min(int(req.limit or 18), 60))
+    flat = [flatten_supplier_product(p) for p in enriched[:limit]]
+
+    await db.search_history.insert_one({
+        "id": new_id(),
+        "endpoint": "v1.suppliers.aliexpress.search",
+        "mode": mode,
+        "query": query,
+        "sort_by": sort_by,
+        "shipping_from": req.shipping_from,
+        "shipping_to": req.shipping_to,
+        "result_count": len(flat),
+        "created_at": now_iso(),
+    })
+    await write_log(
+        "supplier_search",
+        f"AliExpress search '{query}' [{sort_by}] from={req.shipping_from} to={req.shipping_to} → {len(flat)} result(s)",
+    )
+
+    return {
+        "platform": "aliexpress",
+        "query": query,             # echoed verbatim
+        "mode": mode,
+        "sort": sort_by,
+        "shipping_from": req.shipping_from,
+        "shipping_to": req.shipping_to,
+        "limit": limit,
+        "exact_match": exact is not None,
+        "count": len(flat),
+        "results": flat,
     }
 
 
@@ -802,6 +990,23 @@ async def releases_list():
 # ──────────────────────────────────────────────────────────────────────────────
 #  Maintenance
 # ──────────────────────────────────────────────────────────────────────────────
+@api.get("/maintenance")
+async def maintenance_list():
+    """List available maintenance targets and what they clear."""
+    return {
+        "available_targets": ["history", "saved", "drafts", "cache", "logs", "all"],
+        "descriptions": {
+            "history": "Clear Discovery search history",
+            "saved": "Clear saved searches (placeholder for future module)",
+            "drafts": "Clear unpublished Import List drafts — preserves published WC products",
+            "cache": "Clear temporary image cache (placeholder)",
+            "logs": "Clear activity logs",
+            "all": "Clear all of the above (published WC products always preserved)",
+        },
+        "endpoint": "POST /api/maintenance/clear?target={target}",
+    }
+
+
 @api.post("/maintenance/clear")
 async def maintenance_clear(target: str = Query(..., regex="^(history|saved|drafts|cache|logs|all)$")):
     deleted = {}
@@ -823,10 +1028,27 @@ async def maintenance_clear(target: str = Query(..., regex="^(history|saved|draf
 # ──────────────────────────────────────────────────────────────────────────────
 app.include_router(api)
 
+# Production CORS origins per spec
+ALLOWED_ORIGINS = [
+    "https://dropshipping.nips.live",
+    "https://alloutspares.com",
+    "https://api.nipsdownloads.com",
+    "https://updates.nipsdownloads.com",
+]
+# Also allow Emergent preview origins (for the prototype frontend) and any
+# explicit overrides from CORS_ORIGINS env var.
+_env_origins = [o.strip() for o in os.environ.get("CORS_ORIGINS", "").split(",") if o.strip() and o.strip() != "*"]
+if os.environ.get("CORS_ORIGINS", "*") == "*":
+    # Wildcard for prototype convenience; production should narrow this.
+    ALLOWED_ORIGINS = ["*"]
+else:
+    ALLOWED_ORIGINS = list(dict.fromkeys(ALLOWED_ORIGINS + _env_origins))
+
 app.add_middleware(
     CORSMiddleware,
-    allow_credentials=True,
-    allow_origins=os.environ.get("CORS_ORIGINS", "*").split(","),
+    allow_credentials=False if ALLOWED_ORIGINS == ["*"] else True,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=r"https://.*\.preview\.emergentagent\.com",
     allow_methods=["*"],
     allow_headers=["*"],
 )

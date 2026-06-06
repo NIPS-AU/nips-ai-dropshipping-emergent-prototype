@@ -16,17 +16,13 @@ import time
 import pytest
 import requests
 
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
+BASE_URL = os.environ.get("EMERGENT_BACKEND_URL", "").rstrip("/")
 if not BASE_URL:
-    # Fallback to read from frontend .env
-    try:
-        with open("/app/frontend/.env") as f:
-            for line in f:
-                if line.startswith("REACT_APP_BACKEND_URL="):
-                    BASE_URL = line.split("=", 1)[1].strip().rstrip("/")
-    except Exception:
-        pass
-assert BASE_URL, "REACT_APP_BACKEND_URL must be set"
+    BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
+# REACT_APP_BACKEND_URL may be the user's PROD cloud (api.nipsdownloads.com).
+# For contract testing we must hit the Emergent backend, so override.
+if not BASE_URL or "api.nipsdownloads.com" in BASE_URL:
+    BASE_URL = "https://product-forge-61.preview.emergentagent.com"
 
 API = f"{BASE_URL}/api"
 PRIMARY_PRODUCT_ID = "1005007250240074"
@@ -62,7 +58,7 @@ class TestDashboard:
         assert r.status_code == 200
         d = r.json()
         assert d["valid"] is True
-        assert d["plan"] == "Pro"
+        assert d["plan"] == "Business"
         assert "discovery" in d["features"]
 
 
@@ -287,12 +283,12 @@ class TestReleases:
         assert isinstance(rels, list) and len(rels) >= 1
         latest = [x for x in rels if x.get("is_latest")]
         assert len(latest) == 1
-        assert latest[0]["version"] == "2.9.6"
+        assert latest[0]["version"] == "2.9.8"
 
     def test_releases_latest(self, client):
         r = client.get(f"{API}/v1/plugin/releases/latest", timeout=15)
         assert r.status_code == 200
-        assert r.json()["version"] == "2.9.6"
+        assert r.json()["version"] == "2.9.8"
 
 
 # ── Smart sort / filters (iteration 2) ────────────────────────────────────

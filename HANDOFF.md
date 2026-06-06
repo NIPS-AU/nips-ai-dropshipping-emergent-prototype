@@ -86,7 +86,100 @@ GET    /api/v1/plugin/releases/latest
 GET    /api/v1/plugin/releases/download?version=X.X.X&license_key=...   ← prod only
 
 POST   /api/maintenance/clear?target=history|drafts|cache|logs|all
+GET    /api/maintenance                                     ← available targets + descriptions
+
+POST   /v1/suppliers/aliexpress/search                      ← canonical supplier search (prod path)
+POST   /api/v1/suppliers/aliexpress/search                  ← same contract, Emergent-routable
 ```
+
+### Canonical supplier search contract
+
+**Production URL**: `POST https://api.nipsdownloads.com/v1/suppliers/aliexpress/search`
+**Emergent reference**: `POST /api/v1/suppliers/aliexpress/search` (Emergent ingress requires `/api/*`)
+
+Request body — the frontend sends the user-typed query verbatim:
+```json
+{
+  "query": "Makita Cordless Charger & Battery",
+  "platform": "aliexpress",
+  "shipping_from": "ALL",
+  "shipping_to": "AU",
+  "sort": "cheapest",
+  "limit": 18
+}
+```
+
+Sort values: `best_score`, `profit_top`, `profit_pct_top`, `cheapest`, `best_rating`, `most_orders`, `fastest_shipping`, `free_shipping`, `min_reviews_100`.
+`shipping_from` / `shipping_to`: ISO country code or `ALL` / `any`.
+`limit`: clamped server-side to 1–60.
+
+Response body:
+```json
+{
+  "platform": "aliexpress",
+  "query": "Makita Cordless Charger & Battery",
+  "mode": "name | url | sku",
+  "sort": "cheapest",
+  "shipping_from": "ALL",
+  "shipping_to": "AU",
+  "limit": 18,
+  "exact_match": false,
+  "count": 6,
+  "results": [
+    {
+      "product_id": "1005...",
+      "sku": "AE-1005...",
+      "title": "...",
+      "product_url": "https://www.aliexpress.com/item/1005....html",
+      "supplier_url": "https://www.aliexpress.com/item/1005....html",
+      "price": 12.49,
+      "retail_price": 39.99,
+      "profit_estimate": 27.50,
+      "profit_pct": 220.2,
+      "currency": "USD",
+      "category": "...",
+      "tags": ["..."],
+      "main_image": "...",
+      "gallery_images": ["..."],
+      "description_images": ["..."],
+      "description": "...",
+      "specifications": [{"name":"...", "value":"..."}],
+      "attributes": [{"name":"...", "values":["..."]}],
+      "variants": [
+        {"variant_id":"...", "sku":"...", "title":"...", "image":"...",
+         "price":12.49, "retail_price":39.99, "attributes":{...}, "stock":2000}
+      ],
+      "shipping_method": "AliExpress Standard Shipping",
+      "shipping_price": 0.0,
+      "shipping_from": "CN",
+      "shipping_to": "US",
+      "estimated_delivery": "12-20 days",
+      "has_shipping": true,
+      "free_shipping": true,
+      "rating": 4.7,
+      "orders": 44218,
+      "stock": 5421,
+      "supplier": {
+        "name": "...", "store_url": "https://...", "rating": 4.7,
+        "feedback_count": 18421, "country": "CN"
+      },
+      "meta": { "score": 81.7, "profit_pct": 220.2, "shipping_days_min": 12,
+                "free_shipping": true, "orders": 44218, "rating": 4.7,
+                "feedback_count": 18421, "score_breakdown": { ... } }
+    }
+  ]
+}
+```
+
+### CORS (must match in production Nginx / Express)
+
+Allow origins:
+- `https://dropshipping.nips.live` (the public frontend)
+- `https://alloutspares.com` (test WordPress store)
+- `https://*.preview.emergentagent.com` (Emergent preview, regex)
+- Any other authorised customer storefront
+
+Allowed methods: `*` · Allowed headers: `*` · Credentials: `true`
 
 In production, every request from the WordPress plugin should include a `X-NIPS-License-Key` header. The cloud API validates it against `licenses` before doing anything else.
 
