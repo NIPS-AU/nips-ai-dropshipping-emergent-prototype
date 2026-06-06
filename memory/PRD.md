@@ -23,24 +23,25 @@ Emergent prototype stack: React + FastAPI + MongoDB cloud dashboard that **simul
 9. Variant isolation as separate draft products.
 10. Activity logs, plugin release list, license / cloud / maintenance page.
 
-## What's been implemented — 2026-02-12 (v2.9.6 prototype)
+## What's been implemented — 2026-02-12 (v2.9.6 prototype + smart sort)
 - **Backend (FastAPI + MongoDB)** — `/app/backend/server.py`
   - Dashboard stats, license status
   - Discovery search (auto-detect + 5 modes) with exact AliExpress URL capture
+  - **Smart sort/filter (added 2026-02-12)** — 9 sort modes (best_score, profit_top, profit_pct_top, cheapest, best_rating, most_orders, fastest_shipping, free_shipping, min_reviews_100) + `filter_free_shipping` + `filter_min_reviews` params, with `compute_meta()` heuristic scoring (profit margin 30%, rating 15%, reviews 15%, shipping speed 10%, free shipping 10%, content quality 10%, images 5%, variants 5%)
   - Search history (persisted, clearable)
   - Import drafts CRUD with variant isolation
   - AI settings + AI rewrite via Emergent Universal Key (OpenAI gpt-5.2)
   - Mock publish endpoint with publish log
   - Activity logs + maintenance/clear endpoints
   - Mock plugin release server (`/v1/plugin/releases/latest`, list)
-- **Mock catalog** — `/app/backend/mock_data.py` with 6 supplier products (full schema: variants, attributes, specs, shipping, gallery)
+- **Mock catalog** — `/app/backend/mock_data.py` with 6 supplier products (full schema)
 - **Frontend (React + Tailwind + shadcn)**:
   - Dashboard layout with fixed left sidebar
-  - Pages: Dashboard, Discovery, ImportList, ProductStudio, AISettings, Logs, CloudSettings, Releases
+  - Pages: Dashboard, Discovery (with smart sort dropdown, filter switches, score badges, score-breakdown popover), ImportList, ProductStudio, AISettings, Logs, CloudSettings (with handoff doc pointer), Releases
   - Cabinet Grotesk + Satoshi fonts via Fontshare
   - Blue primary CTAs, white cards on slate-50 background
-  - Toast notifications via sonner
-  - AI before/after dialog, mock publish dialog with WC product id
+- **Developer handoff** — `/app/HANDOFF.md` maps every prototype piece to the production Node/Express + PostgreSQL + WordPress plugin system
+- **Tests** — `/app/backend/tests/backend_test.py` (32/32 passing including the 13 new sort/filter tests)
 
 ## Prioritized backlog
 - **P1** — Real AliExpress capture (replace mock with NIPS-AI Cloud supplier proxy)
