@@ -10,8 +10,16 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
+import {
+  Popover, PopoverContent, PopoverTrigger,
+} from "@/components/ui/popover";
 import { formatCurrency } from "@/lib/format";
-import { Search as SearchIcon, Link as LinkIcon, Tag, Box, Globe, Sparkles, Trash2, History as HistoryIcon, Truck, Layers } from "lucide-react";
+import {
+  Search as SearchIcon, Link as LinkIcon, Tag, Box, Globe, Sparkles, Trash2,
+  History as HistoryIcon, Truck, Layers, TrendingUp, Star, ShoppingCart,
+  Zap, Trophy, Info,
+} from "lucide-react";
 
 const MODES = [
   { value: "auto", label: "Auto Detect", icon: Sparkles },
@@ -22,42 +30,89 @@ const MODES = [
   { value: "supplier", label: "Supplier URL", icon: Globe },
 ];
 
+const SORTS = [
+  { value: "best_score", label: "Best dropshipping score", icon: Trophy, group: "Smart" },
+  { value: "profit_pct_top", label: "Highest profit %", icon: TrendingUp, group: "Smart" },
+  { value: "profit_top", label: "Highest estimated profit", icon: TrendingUp, group: "Smart" },
+  { value: "cheapest", label: "Cheapest supplier price", icon: Tag, group: "Price" },
+  { value: "best_rating", label: "Best supplier rating", icon: Star, group: "Trust" },
+  { value: "most_orders", label: "Most orders / sales", icon: ShoppingCart, group: "Trust" },
+  { value: "fastest_shipping", label: "Fastest shipping", icon: Zap, group: "Logistics" },
+  { value: "free_shipping", label: "Free shipping only", icon: Truck, group: "Logistics" },
+  { value: "min_reviews_100", label: "100+ reviews only", icon: Star, group: "Trust" },
+];
+
+function ScoreRing({ score }) {
+  const c = score >= 75 ? "text-emerald-600" : score >= 55 ? "text-blue-600" : "text-amber-600";
+  return (
+    <div
+      data-testid="product-score"
+      className={`inline-flex items-center gap-1 rounded-full bg-white border border-slate-200 px-2 py-1 text-[11px] font-semibold ${c}`}
+      title="Prototype dropshipping score — heuristic only"
+    >
+      <Trophy className="w-3 h-3" />
+      {score.toFixed(0)}
+    </div>
+  );
+}
+
 function ProductCard({ p, onImport, isolate, setIsolate }) {
   const variants = p.variants || [];
+  const meta = p.meta || {};
   return (
     <Card data-testid={`discovery-card-${p.product_id}`} className="border-slate-200 shadow-sm overflow-hidden flex flex-col">
       <div className="relative aspect-square bg-slate-100">
         <img src={p.main_image} alt={p.title} className="w-full h-full object-cover" />
-        {variants.length > 0 && (
-          <Badge className="absolute top-3 left-3 bg-blue-600 text-white">
-            {variants.length} variants
+        <div className="absolute top-3 left-3 flex flex-col gap-1.5">
+          {variants.length > 0 && (
+            <Badge className="bg-blue-600 text-white">{variants.length} variants</Badge>
+          )}
+          <Badge className="bg-white text-slate-700 border border-slate-200">
+            {(p.gallery_images || []).length} images
           </Badge>
-        )}
-        <Badge className="absolute top-3 right-3 bg-white text-slate-700 border border-slate-200">
-          {(p.gallery_images || []).length} images
-        </Badge>
+        </div>
+        <div className="absolute top-3 right-3">
+          {meta.score !== undefined && <ScoreRing score={meta.score} />}
+        </div>
       </div>
       <CardContent className="p-5 flex flex-col gap-3 flex-1">
         <h3 className="text-base font-medium text-slate-900 line-clamp-2 leading-snug">{p.title}</h3>
+
         <div className="flex items-end justify-between">
           <div>
             <div className="text-2xl font-display font-bold text-blue-600">
               {formatCurrency(p.price, p.currency)}
             </div>
             <div className="text-xs text-slate-500">
-              Retail {formatCurrency(p.retail_price, p.currency)} · est. profit{" "}
-              <span className="text-emerald-700 font-semibold">{formatCurrency(p.profit_estimate, p.currency)}</span>
+              Retail {formatCurrency(p.retail_price, p.currency)} ·{" "}
+              <span className="text-emerald-700 font-semibold">
+                +{formatCurrency(p.profit_estimate, p.currency)}
+              </span>{" "}
+              ({meta.profit_pct ?? 0}%)
             </div>
           </div>
           <Badge variant="secondary" className="bg-slate-100 text-slate-600 text-[11px] font-mono">
             {p.product_id}
           </Badge>
         </div>
-        <div className="text-xs text-slate-500 flex items-center gap-1.5">
-          <Truck className="w-3.5 h-3.5" />
-          {p.shipping?.has_shipping
-            ? `${p.shipping.price ? formatCurrency(p.shipping.price) : "Free"} · ${p.shipping.estimated_delivery}`
-            : "Shipping info unavailable"}
+
+        <div className="grid grid-cols-2 gap-y-1 gap-x-3 text-[11px] text-slate-500 border-t border-slate-100 pt-2">
+          <div className="flex items-center gap-1">
+            <Star className="w-3 h-3 text-amber-500" />
+            {meta.rating?.toFixed(1)} · {meta.feedback_count?.toLocaleString?.()} reviews
+          </div>
+          <div className="flex items-center gap-1">
+            <ShoppingCart className="w-3 h-3 text-slate-400" />
+            {meta.orders?.toLocaleString?.()} orders
+          </div>
+          <div className="flex items-center gap-1">
+            <Truck className="w-3 h-3 text-slate-400" />
+            {meta.free_shipping ? "Free shipping" : formatCurrency(p.shipping?.price)}
+          </div>
+          <div className="flex items-center gap-1">
+            <Zap className="w-3 h-3 text-slate-400" />
+            from {meta.shipping_days_min}d
+          </div>
         </div>
 
         <div className="border-t border-slate-100 pt-3 flex items-center justify-between gap-2">
@@ -89,13 +144,22 @@ export default function Discovery() {
   const qc = useQueryClient();
   const [mode, setMode] = useState("auto");
   const [query, setQuery] = useState("");
+  const [sortBy, setSortBy] = useState("best_score");
+  const [filterFree, setFilterFree] = useState(false);
+  const [filterMinReviews, setFilterMinReviews] = useState(0);
   const [data, setData] = useState(null);
   const [isolate, setIsolate] = useState({});
 
   const { data: history } = useQuery({ queryKey: ["history"], queryFn: endpoints.discoveryHistory });
 
   const search = useMutation({
-    mutationFn: () => endpoints.discoverySearch({ mode, query }),
+    mutationFn: () => endpoints.discoverySearch({
+      mode,
+      query,
+      sort_by: sortBy,
+      filter_free_shipping: filterFree,
+      filter_min_reviews: filterMinReviews,
+    }),
     onSuccess: (res) => {
       setData(res);
       qc.invalidateQueries({ queryKey: ["history"] });
@@ -120,6 +184,11 @@ export default function Discovery() {
   });
 
   const onImport = (p) => importMut.mutate({ product_id: p.product_id, isolate_variants: !!isolate[p.product_id] });
+  const runSearch = () => search.mutate();
+
+  // re-run when sort/filter changes if we already have results
+  const onSortChange = (v) => { setSortBy(v); if (data) search.mutate(); };
+  const onFreeChange = (v) => { setFilterFree(v); if (data) setTimeout(() => search.mutate(), 0); };
 
   return (
     <div data-testid="discovery-page">
@@ -130,10 +199,10 @@ export default function Discovery() {
       />
 
       <Card className="border-slate-200 shadow-sm">
-        <CardContent className="p-4">
+        <CardContent className="p-4 space-y-3">
           <div className="flex flex-col md:flex-row gap-3 items-stretch">
             <Select value={mode} onValueChange={setMode}>
-              <SelectTrigger data-testid="discovery-mode" className="md:w-56">
+              <SelectTrigger data-testid="discovery-mode" className="md:w-52">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -152,13 +221,13 @@ export default function Discovery() {
               data-testid="discovery-input"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && search.mutate()}
+              onKeyDown={(e) => e.key === "Enter" && runSearch()}
               placeholder="Search products, paste AliExpress URL, or enter SKU…"
               className="flex-1 h-11"
             />
             <Button
               data-testid="discovery-search-btn"
-              onClick={() => search.mutate()}
+              onClick={runSearch}
               disabled={search.isPending || !query.trim()}
               className="bg-blue-600 hover:bg-blue-700 h-11 px-6"
             >
@@ -167,7 +236,83 @@ export default function Discovery() {
             </Button>
           </div>
 
-          <div className="mt-3 text-xs text-slate-500 flex items-center justify-between flex-wrap gap-2">
+          {/* Smart sort + filters bar */}
+          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
+            <div className="flex items-center gap-2">
+              <span className="text-xs uppercase tracking-widest text-slate-400">Sort</span>
+              <Select value={sortBy} onValueChange={onSortChange}>
+                <SelectTrigger data-testid="discovery-sort" className="h-9 w-64">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {SORTS.map((s) => (
+                    <SelectItem key={s.value} value={s.value} data-testid={`sort-${s.value}`}>
+                      <div className="flex items-center gap-2">
+                        <s.icon className="w-3.5 h-3.5" />
+                        <span>{s.label}</span>
+                        <Badge variant="secondary" className="bg-slate-100 text-slate-500 text-[10px] ml-2">
+                          {s.group}
+                        </Badge>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="ml-auto flex items-center gap-3 text-xs text-slate-600">
+              <label className="flex items-center gap-2 select-none">
+                <Switch
+                  data-testid="filter-free-shipping"
+                  checked={filterFree}
+                  onCheckedChange={onFreeChange}
+                />
+                Free shipping
+              </label>
+              <label className="flex items-center gap-2 select-none">
+                <Switch
+                  data-testid="filter-min-reviews"
+                  checked={filterMinReviews >= 100}
+                  onCheckedChange={(v) => {
+                    setFilterMinReviews(v ? 100 : 0);
+                    if (data) setTimeout(() => search.mutate(), 0);
+                  }}
+                />
+                100+ reviews
+              </label>
+
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" size="sm" data-testid="score-explain-trigger" className="h-8 text-slate-500">
+                    <Info className="w-3.5 h-3.5 mr-1" />
+                    How is the score calculated?
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-96 text-xs leading-relaxed" align="end">
+                  <p className="font-semibold text-slate-800 mb-2">Prototype dropshipping score</p>
+                  <p className="text-slate-500 mb-2">
+                    Heuristic 0–100 score combining profit margin, supplier rating, review count,
+                    shipping speed, free-shipping flag, image count, variant completeness and content quality.
+                  </p>
+                  <ul className="space-y-0.5 text-slate-600">
+                    <li>· Profit margin · 30%</li>
+                    <li>· Supplier rating · 15%</li>
+                    <li>· Review count · 15%</li>
+                    <li>· Shipping speed · 10%</li>
+                    <li>· Free shipping · 10%</li>
+                    <li>· Content quality · 10%</li>
+                    <li>· Images · 5%</li>
+                    <li>· Variant completeness · 5%</li>
+                  </ul>
+                  <p className="text-amber-700 mt-2 text-[11px]">
+                    Prototype only — not a real revenue prediction.
+                  </p>
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+
+          <div className="text-xs text-slate-500 flex items-center justify-between flex-wrap gap-2">
             <span>
               Try: <code className="font-mono">https://www.aliexpress.com/item/1005007250240074.html</code>
             </span>
@@ -200,21 +345,32 @@ export default function Discovery() {
             <h2 className="font-display text-xl font-semibold text-slate-900">
               {data.exact_match ? "Exact product captured" : `${data.count} result(s)`}
             </h2>
-            <Badge variant="secondary" className="bg-blue-50 text-blue-700 capitalize">
-              {data.mode} search
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary" className="bg-blue-50 text-blue-700 capitalize">
+                {data.mode} search
+              </Badge>
+              <Badge variant="secondary" className="bg-slate-100 text-slate-600">
+                Sort: {(SORTS.find((s) => s.value === data.sort_by) || {}).label || data.sort_by}
+              </Badge>
+            </div>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {data.results.map((p) => (
-              <ProductCard
-                key={p.product_id}
-                p={p}
-                onImport={onImport}
-                isolate={isolate}
-                setIsolate={setIsolate}
-              />
-            ))}
-          </div>
+          {data.count === 0 ? (
+            <p className="text-sm text-slate-500" data-testid="no-results">
+              No products match the current filters. Try removing a filter.
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {data.results.map((p) => (
+                <ProductCard
+                  key={p.product_id}
+                  p={p}
+                  onImport={onImport}
+                  isolate={isolate}
+                  setIsolate={setIsolate}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
 

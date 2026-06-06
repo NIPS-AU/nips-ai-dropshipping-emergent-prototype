@@ -78,6 +78,9 @@ def strip_mongo(doc: dict) -> dict:
 class SearchRequest(BaseModel):
     mode: str = Field(default="auto")  # auto | name | url | sku | category | supplier
     query: str = ""
+    sort_by: str = "best_score"  # see SORT_OPTIONS below
+    filter_free_shipping: bool = False
+    filter_min_reviews: int = 0  # eg 100 for "100+ reviews"
 
 
 class ImportRequest(BaseModel):
@@ -145,6 +148,144 @@ def detect_mode(query: str) -> str:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+#  Smart sort scoring (prototype heuristic — NOT a real revenue model)
+# ──────────────────────────────────────────────────────────────────────────────
+import math  # noqa: E402
+
+SORT_OPTIONS = {
+    "cheapest",          # supplier price asc
+    "profit_top",        # estimated profit $ desc
+    "profit_pct_top",    # profit % desc
+    "best_rating",       # supplier rating desc
+    "most_orders",       # orders desc
+    "fastest_shipping",  # min shipping days asc
+    "free_shipping",     # filter free + score desc
+    "min_reviews_100",   # filter ≥100 reviews + score desc
+    "best_score",        # composite score desc (default)
+}
+
+
+def parse_shipping_min_days(s: str) -> int:
+    if not s:
+        return 30
+    m = re.search(r"(\d+)\s*-\s*(\d+)", s)
+    if m:
+        return int(m.group(1))
+    m = re.search(r"(\d+)", s)
+    return int(m.group(1)) if m else 30
+
+
+def compute_meta(p: dict) -> dict:
+    """Prototype scoring helper — heuristic only, NOT a revenue prediction."""
+    price = float(p.get("price") or 0)
+    retail = float(p.get("retail_price") or 0)
+    profit = retail - price
+    profit_pct = (profit / price * 100.0) if price else 0.0
+
+    sup = p.get("supplier", {}) or {}
+    rating = float(sup.get("rating") or 0)
+    feedback = int(sup.get("feedback_count") or 0)
+
+    images = len(p.get("gallery_images") or [])
+    variants = len(p.get("variants") or [])
+    specs = len(p.get("specifications") or [])
+    desc_len = len(p.get("description") or "")
+
+    ship = p.get("shipping") or {}
+    ship_days = parse_shipping_min_days(ship.get("estimated_delivery"))
+    ship_price = float(ship.get("price") or 0)
+    free_ship = ship_price == 0 and bool(ship.get("has_shipping"))
+
+    # Derive a synthetic "orders" count from feedback (prototype only)
+    orders = int(feedback * 2.4)
+
+    # Normalize 0..1
+    n_profit = min(max(profit_pct / 300.0, 0.0), 1.0)            # 300% = cap
+    n_rating = min(max(rating / 5.0, 0.0), 1.0)
+    n_reviews = min(math.log10(feedback + 1) / 5.0, 1.0)
+    n_ship = max(0.0, 1.0 - ship_days / 30.0)
+    n_images = min(images / 8.0, 1.0)
+    n_variants = min(variants / 3.0, 1.0)
+    n_quality = (min(desc_len / 600.0, 1.0) * 0.5) + (min(specs / 8.0, 1.0) * 0.5)
+
+    weights = {
+        "profit": 0.30,
+        "rating": 0.15,
+        "reviews": 0.15,
+        "shipping": 0.10,
+        "free_shipping": 0.10,
+        "images": 0.05,
+        "variants": 0.05,
+        "quality": 0.10,
+    }
+    score = (
+        weights["profit"] * n_profit
+        + weights["rating"] * n_rating
+        + weights["reviews"] * n_reviews
+        + weights["shipping"] * n_ship
+        + weights["free_shipping"] * (1.0 if free_ship else 0.0)
+        + weights["images"] * n_images
+        + weights["variants"] * n_variants
+        + weights["quality"] * n_quality
+    )
+
+    return {
+        "score": round(score * 100.0, 1),
+        "profit_pct": round(profit_pct, 1),
+        "shipping_days_min": ship_days,
+        "free_shipping": free_ship,
+        "orders": orders,
+        "rating": rating,
+        "feedback_count": feedback,
+        "score_breakdown": {
+            "profit_margin": round(n_profit, 3),
+            "rating": round(n_rating, 3),
+            "reviews": round(n_reviews, 3),
+            "shipping_speed": round(n_ship, 3),
+            "free_shipping": 1.0 if free_ship else 0.0,
+            "images": round(n_images, 3),
+            "variants": round(n_variants, 3),
+            "content_quality": round(n_quality, 3),
+            "weights": weights,
+        },
+    }
+
+
+def enrich(p: dict) -> dict:
+    out = dict(p)
+    out["meta"] = compute_meta(p)
+    return out
+
+
+def apply_sort_and_filters(items, sort_by: str, filter_free: bool, filter_min_reviews: int):
+    rows = [enrich(p) for p in items]
+
+    if sort_by == "free_shipping":
+        rows = [r for r in rows if r["meta"]["free_shipping"]]
+        sort_by = "best_score"
+    if sort_by == "min_reviews_100":
+        rows = [r for r in rows if r["meta"]["feedback_count"] >= 100]
+        sort_by = "best_score"
+    if filter_free:
+        rows = [r for r in rows if r["meta"]["free_shipping"]]
+    if filter_min_reviews and filter_min_reviews > 0:
+        rows = [r for r in rows if r["meta"]["feedback_count"] >= filter_min_reviews]
+
+    key_funcs = {
+        "cheapest": (lambda r: r["price"], False),
+        "profit_top": (lambda r: r["profit_estimate"] if "profit_estimate" in r else (r["retail_price"] - r["price"]), True),
+        "profit_pct_top": (lambda r: r["meta"]["profit_pct"], True),
+        "best_rating": (lambda r: r["meta"]["rating"], True),
+        "most_orders": (lambda r: r["meta"]["orders"], True),
+        "fastest_shipping": (lambda r: r["meta"]["shipping_days_min"], False),
+        "best_score": (lambda r: r["meta"]["score"], True),
+    }
+    key_fn, reverse = key_funcs.get(sort_by, key_funcs["best_score"])
+    rows.sort(key=key_fn, reverse=reverse)
+    return rows
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 #  Health / dashboard
 # ──────────────────────────────────────────────────────────────────────────────
 @api.get("/")
@@ -200,41 +341,53 @@ async def license_status():
 async def discovery_search(req: SearchRequest):
     mode = req.mode if req.mode and req.mode != "auto" else detect_mode(req.query)
 
-    results: list[dict] = []
+    raw_results: list[dict] = []
     exact = None
 
     if mode == "url":
         product = find_by_url(req.query)
         if product:
             exact = product
-            results = [product]
+            raw_results = [product]
     elif mode == "sku":
         product = find_by_id(req.query.strip())
         if product:
             exact = product
-            results = [product]
+            raw_results = [product]
         else:
-            results = search_keyword(req.query)
+            raw_results = search_keyword(req.query)
     elif mode == "category":
-        results = search_category(req.query)
+        raw_results = search_category(req.query)
     elif mode == "supplier":
-        results = search_supplier(req.query)
+        raw_results = search_supplier(req.query)
     else:
-        results = search_keyword(req.query)
+        raw_results = search_keyword(req.query)
+
+    sort_by = req.sort_by if req.sort_by in SORT_OPTIONS else "best_score"
+    results = apply_sort_and_filters(
+        raw_results,
+        sort_by=sort_by,
+        filter_free=req.filter_free_shipping,
+        filter_min_reviews=req.filter_min_reviews,
+    )
 
     # Persist search history
     await db.search_history.insert_one({
         "id": new_id(),
         "mode": mode,
         "query": req.query,
+        "sort_by": sort_by,
         "result_count": len(results),
         "created_at": now_iso(),
     })
-    await write_log("search", f"{mode.upper()} search '{req.query}' → {len(results)} result(s)")
+    await write_log("search", f"{mode.upper()} search '{req.query}' [{sort_by}] → {len(results)} result(s)")
 
     return {
         "mode": mode,
         "query": req.query,
+        "sort_by": sort_by,
+        "filter_free_shipping": req.filter_free_shipping,
+        "filter_min_reviews": req.filter_min_reviews,
         "exact_match": exact is not None,
         "count": len(results),
         "results": results,

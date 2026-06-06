@@ -83,6 +83,9 @@ export default function CloudSettings() {
             <li><strong>Release server</strong> at <code>updates.nipsau.com</code>: serves plugin ZIPs from <code>/opt/nips-ai-dropshipping-cloud/storage/releases</code>.</li>
             <li><strong>Customer data</strong> always stays on the WordPress site unless cloud sync is explicitly enabled.</li>
           </ul>
+          <p className="pt-2 text-xs text-slate-500">
+            Full developer handoff document: <code className="font-mono">/app/HANDOFF.md</code> — covers data model mapping, scoring port, publish flow, release server and rate-limiting recommendations.
+          </p>
         </CardContent>
       </Card>
     </div>

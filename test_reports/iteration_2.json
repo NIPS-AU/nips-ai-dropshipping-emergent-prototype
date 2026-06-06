@@ -1,0 +1,34 @@
+{
+  "summary": "Iteration 2 — Smart sort/filter validated end-to-end. Added 13 new pytest cases for sort/filter behaviour; all pass (32/32 backend tests overall). Frontend Discovery page exposes all required data-testid hooks (discovery-sort, filter-free-shipping, filter-min-reviews, score-explain-trigger, product-score, sort-{value}); changing sort or toggling free-shipping auto re-runs search and reorders/filters results correctly; score popover renders with weight breakdown. Previous iteration-1 flows (exact URL capture, imports CRUD, publish, AI rewrite) still pass.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_iter2.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py now ~820 lines with sort/filter logic inline — recommend extracting discovery scoring (compute_meta, apply_sort_and_filters, SORT_OPTIONS, parse_shipping_min_days) into /app/backend/discovery_scoring.py for testability and to keep server.py routing-focused.",
+    "compute_meta() casts feedback_count via int(sup.get('feedback_count') or 0) but if a supplier sends a string like '18,000' it will raise. Add a tolerant parser or pre-clean in mock_data.",
+    "apply_sort_and_filters mutates sort_by locally after pseudo-sort options ('free_shipping'/'min_reviews_100') — this is fine but the response field 'sort_by' in /api/discovery/search still echoes the *original* request value (e.g. 'free_shipping'), which the frontend label resolves correctly via SORTS lookup. Confirmed working but slightly confusing; consider returning the effective sort and a separate 'applied_filters' object.",
+    "ScoreRing in Discovery.jsx assumes meta.score is always a finite number; if a future product has price=0 the profit_pct becomes 0 (safe) but other call sites should guard against undefined when re-using ScoreRing elsewhere (e.g., Import List/Studio).",
+    "Discovery.jsx onSortChange and onFreeChange both call search.mutate() — but if the user changes sort before a first search, that path is correctly guarded by `if (data)`. Good. However, filter-min-reviews toggle inlines setTimeout(...,0) — consider unifying into a single onFilterChange util to avoid drift."
+  ],
+  "updated_files": [
+    "/app/backend/tests/backend_test.py (added TestSortFilters class with 13 tests)"
+  ],
+  "success_rate": {"backend": "100% (32/32)", "frontend": "100%"},
+  "test_credentials": "No auth required — public API. EMERGENT_LLM_KEY already configured.",
+  "seed_data_creation": "Tests use mock catalog (no DB writes for sort/filter tests). Imports/publish tests create TEST_-prefixed drafts; cleaned via DELETE flow.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iteration 2 sort/filter (9 sort modes + 2 filters) now fully covered by TestSortFilters in /app/backend/tests/backend_test.py. Mock catalog has exactly 2 free-shipping products. compute_meta is heuristic-only — score sort is verified by monotonic-descending assertion, not by hard-coded scores. Frontend tested with viewport 1920x1080 on /discovery. Key new selectors: data-testid='discovery-sort', 'sort-{value}', 'filter-free-shipping', 'filter-min-reviews', 'score-explain-trigger', 'product-score'. The 'name' mode with empty query falls back to entire catalog (6 products) — confirmed useful for sort coverage but iteration test uses 'headphones' keyword for a 2-result deterministic ordering.",
+  "rca of the issue": "No issues found."
+}

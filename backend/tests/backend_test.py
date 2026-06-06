@@ -295,6 +295,101 @@ class TestReleases:
         assert r.json()["version"] == "2.9.6"
 
 
+# ── Smart sort / filters (iteration 2) ────────────────────────────────────
+class TestSortFilters:
+    FREE_SHIP_ID = "1005007250240074"   # earbuds — free shipping, 18k reviews
+    PAID_SHIP_ID = "1005006543210987"   # apple watch strap — paid shipping, 41k reviews
+    META_KEYS = {"score", "profit_pct", "shipping_days_min", "free_shipping",
+                 "orders", "rating", "feedback_count", "score_breakdown"}
+
+    def _search(self, client, **kwargs):
+        body = {"mode": "name", "query": ""}
+        body.update(kwargs)
+        return client.post(f"{API}/discovery/search", json=body, timeout=20)
+
+    def test_meta_present_on_every_result(self, client):
+        r = self._search(client, sort_by="best_score")
+        assert r.status_code == 200
+        d = r.json()
+        assert d["count"] >= 2
+        for p in d["results"]:
+            assert "meta" in p, "meta object missing"
+            assert self.META_KEYS.issubset(p["meta"].keys())
+            assert isinstance(p["meta"]["score"], (int, float))
+            assert isinstance(p["meta"]["score_breakdown"], dict)
+
+    def test_sort_best_score_desc(self, client):
+        d = self._search(client, sort_by="best_score").json()
+        scores = [p["meta"]["score"] for p in d["results"]]
+        assert scores == sorted(scores, reverse=True)
+        assert d["sort_by"] == "best_score"
+
+    def test_sort_cheapest_asc(self, client):
+        d = self._search(client, sort_by="cheapest").json()
+        prices = [p["price"] for p in d["results"]]
+        assert prices == sorted(prices)
+
+    def test_sort_profit_pct_top_desc(self, client):
+        d = self._search(client, sort_by="profit_pct_top").json()
+        vals = [p["meta"]["profit_pct"] for p in d["results"]]
+        assert vals == sorted(vals, reverse=True)
+
+    def test_sort_best_rating_desc(self, client):
+        d = self._search(client, sort_by="best_rating").json()
+        vals = [p["meta"]["rating"] for p in d["results"]]
+        assert vals == sorted(vals, reverse=True)
+
+    def test_sort_fastest_shipping_asc(self, client):
+        d = self._search(client, sort_by="fastest_shipping").json()
+        vals = [p["meta"]["shipping_days_min"] for p in d["results"]]
+        assert vals == sorted(vals)
+
+    def test_sort_most_orders_desc(self, client):
+        d = self._search(client, sort_by="most_orders").json()
+        vals = [p["meta"]["orders"] for p in d["results"]]
+        assert vals == sorted(vals, reverse=True)
+
+    def test_sort_free_shipping_only(self, client):
+        d = self._search(client, sort_by="free_shipping").json()
+        assert d["count"] >= 1
+        for p in d["results"]:
+            assert p["meta"]["free_shipping"] is True
+        ids = {p["product_id"] for p in d["results"]}
+        assert self.FREE_SHIP_ID in ids
+        assert self.PAID_SHIP_ID not in ids
+
+    def test_sort_min_reviews_100(self, client):
+        d = self._search(client, sort_by="min_reviews_100").json()
+        for p in d["results"]:
+            assert p["meta"]["feedback_count"] >= 100
+
+    def test_filter_free_shipping_flag(self, client):
+        d = self._search(client, sort_by="cheapest", filter_free_shipping=True).json()
+        for p in d["results"]:
+            assert p["meta"]["free_shipping"] is True
+        # Confirm paid-shipping product excluded
+        ids = {p["product_id"] for p in d["results"]}
+        assert self.PAID_SHIP_ID not in ids
+
+    def test_filter_min_reviews_10000(self, client):
+        d = self._search(client, sort_by="best_score", filter_min_reviews=10000).json()
+        for p in d["results"]:
+            assert p["meta"]["feedback_count"] >= 10000
+
+    def test_filter_min_reviews_excludes_low(self, client):
+        # Use very high threshold to ensure filtering really runs
+        d = self._search(client, filter_min_reviews=999999999).json()
+        assert d["count"] == 0
+
+    def test_invalid_sort_by_falls_back(self, client):
+        r = self._search(client, sort_by="totally_not_a_sort")
+        assert r.status_code == 200
+        d = r.json()
+        assert d["sort_by"] == "best_score"  # silent fallback
+        scores = [p["meta"]["score"] for p in d["results"]]
+        assert scores == sorted(scores, reverse=True)
+
+
 # ── Maintenance ───────────────────────────────────────────────────────────
 class TestMaintenance:
     def test_clear_history(self, client):
