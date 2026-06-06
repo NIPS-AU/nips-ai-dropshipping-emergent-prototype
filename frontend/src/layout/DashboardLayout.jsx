@@ -76,7 +76,7 @@ function Sidebar() {
           <CircleDot className="w-4 h-4 text-emerald-500 mt-0.5" />
           <div>
             <div className="font-medium text-slate-700">Cloud connected</div>
-            <div className="text-slate-500">api.nipsau.com</div>
+            <div className="text-slate-500">api.nipsdownloads.com</div>
             <div className="text-slate-400 mt-1">
               License: {license?.plan ? `${license.plan} • ${license.key?.slice(-4)}` : "—"}
             </div>

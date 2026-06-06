@@ -1,9 +1,9 @@
 # NIPS-AI Dropshipping — PRD (Prototype)
 
 ## Original problem statement
-Build a production-ready SaaS-style WooCommerce dropshipping plugin and cloud dashboard called NIPS-AI Dropshipping. Customer installs a PHP WordPress plugin that talks to a managed cloud API (api.nipsau.com). Cloud owns supplier API connections, licensing, AI rewrite, release/update server. Workflow: Discovery → Import List (drafts) → Product Studio (editor + AI) → Publish to WooCommerce (draft/simple/variable/isolated variants).
+Build a production-ready SaaS-style WooCommerce dropshipping plugin and cloud dashboard called NIPS-AI Dropshipping. Customer installs a PHP WordPress plugin that talks to a managed cloud API (api.nipsdownloads.com). Cloud owns supplier API connections, licensing, AI rewrite, release/update server. Workflow: Discovery → Import List (drafts) → Product Studio (editor + AI) → Publish to WooCommerce (draft/simple/variable/isolated variants).
 
-Production stack: WordPress (PHP) plugin + Node/Express + PostgreSQL on VPS + Nginx + Docker, release/update server at updates.nipsau.com.
+Production stack: WordPress (PHP) plugin + Node/Express + PostgreSQL on VPS + Nginx + Docker, release/update server at updates.nipsdownloads.com.
 
 Emergent prototype stack: React + FastAPI + MongoDB cloud dashboard that **simulates** the workflow (no PHP plugin deployed here).
 
@@ -57,7 +57,7 @@ Emergent prototype stack: React + FastAPI + MongoDB cloud dashboard that **simul
 ## Architecture map (production)
 - WordPress plugin (PHP) on customer site: Import List drafts, search history, studio edits, WooCommerce product links stored locally
 - NIPS-AI Cloud API on VPS (Node/Express + PostgreSQL): license validation, supplier API proxy, AI rewrite, release server
-- Release server (updates.nipsau.com): plugin ZIPs from /opt/nips-ai-dropshipping-cloud/storage/releases
+- Release server (updates.nipsdownloads.com): plugin ZIPs from /opt/nips-ai-dropshipping-cloud/storage/releases
 - Customer data stays on the customer's site unless cloud sync explicitly enabled
 
 ## Next action items

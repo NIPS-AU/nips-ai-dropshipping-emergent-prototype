@@ -10,10 +10,10 @@ The prototype is a **planning / proof-of-concept dashboard only**. It is not the
 
 | Concern | Prototype (Emergent) | Production (your VPS) |
 | --- | --- | --- |
-| API service | FastAPI (Python) at `:8001`, ingress on `/api/*` | Node.js / Express, behind Nginx, on `api.nipsau.com` (port 4100) |
+| API service | FastAPI (Python) at `:8001`, ingress on `/api/*` | Node.js / Express, behind Nginx, on `api.nipsdownloads.com` (port 4100) |
 | Database | MongoDB (collections below) | PostgreSQL (tables: `licenses`, `plugin_releases`, `cloud_logs`, optional shared supplier cache) |
 | Deployment | Emergent container, supervisor-managed | Docker / docker-compose, Nginx reverse proxy, systemd or compose stack |
-| Plugin distribution | Mock list at `/api/v1/plugin/releases` | Real release server at `updates.nipsau.com`, ZIPs from `/opt/nips-ai-dropshipping-cloud/storage/releases/` |
+| Plugin distribution | Mock list at `/api/v1/plugin/releases` | Real release server at `updates.nipsdownloads.com`, ZIPs from `/opt/nips-ai-dropshipping-cloud/storage/releases/` |
 | Customer storefront | None — dashboard only | PHP WordPress plugin on each customer's WooCommerce site |
 | Supplier (AliExpress) | Static catalog in `mock_data.py` | NIPS-AI Cloud-owned AliExpress API integration (keys never leave the VPS) |
 | AI rewrite | OpenAI `gpt-5.2` via Emergent Universal Key | Same model directly via your own OpenAI key (or keep Emergent key — your choice) |
@@ -182,7 +182,7 @@ In production this maps to creating **N simple WooCommerce products**. The `publ
 
 ## 8. Release server
 
-Prototype list lives in `PLUGIN_RELEASES` constant in `server.py`. The download URLs point at `updates.nipsau.com` but are not served by the prototype.
+Prototype list lives in `PLUGIN_RELEASES` constant in `server.py`. The download URLs point at `updates.nipsdownloads.com` but are not served by the prototype.
 
 Production:
 - Build artefacts at `/opt/nips-ai-dropshipping-cloud/storage/plugin-builds/vX.X.X/nips-ai-dropshipping/`

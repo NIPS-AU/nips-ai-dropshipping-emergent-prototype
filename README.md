@@ -11,7 +11,7 @@ This is the Emergent prototype of the **NIPS-AI Dropshipping Cloud Dashboard**. 
 
 | Layer | Prototype (this repo) | Production target |
 | --- | --- | --- |
-| API | FastAPI (Python 3.11) on `:8001` | Node.js / Express on `api.nipsau.com` (port 4100) |
+| API | FastAPI (Python 3.11) on `:8001` | Node.js / Express on `api.nipsdownloads.com` (port 4100) |
 | Database | MongoDB (motor async driver) | PostgreSQL |
 | Frontend | React 19 + Tailwind 3 + shadcn/ui + craco | (same React dashboard is reusable in production — just swap the API base URL) |
 | Process mgr | supervisor (Emergent container) | Docker / systemd |
@@ -201,7 +201,7 @@ Full payload shapes: hit any endpoint and inspect, or see `/app/backend/server.p
 | --- | --- | --- |
 | **AliExpress product capture** | `/app/backend/mock_data.py` (6 hand-crafted products) and `find_by_id` / `find_by_url` / `search_keyword` / `search_category` / `search_supplier` | Real NIPS-AI Cloud AliExpress API integration on your VPS. Keep the same payload schema so the React dashboard works unchanged. |
 | **WooCommerce publish** | `POST /api/publish` in `server.py` — returns a synthetic `wc_product_id` (timestamp-derived) and a fake step log | Real WooCommerce REST API or PHP `wp_insert_post` + WC meta on the customer's WordPress site, triggered by the PHP plugin. |
-| **Plugin release server** | `PLUGIN_RELEASES` constant in `server.py` + `GET /api/v1/plugin/releases[/latest]` | Real release server at `updates.nipsau.com`. ZIPs from `/opt/nips-ai-dropshipping-cloud/storage/releases/`, served by Nginx after license-key validation. WP plugin hooks into the WordPress update transient. |
+| **Plugin release server** | `PLUGIN_RELEASES` constant in `server.py` + `GET /api/v1/plugin/releases[/latest]` | Real release server at `updates.nipsdownloads.com`. ZIPs from `/opt/nips-ai-dropshipping-cloud/storage/releases/`, served by Nginx after license-key validation. WP plugin hooks into the WordPress update transient. |
 | **"orders" count** | `compute_meta()` in `server.py` — `orders = feedback_count * 2.4` | Real `orders_count` field from the AliExpress API. |
 | **License validation** | `GET /api/license/status` — always returns the same hardcoded license | Real Postgres `licenses` table + `X-NIPS-License-Key` header on every plugin → cloud request. |
 | **Image gallery URLs** | Unsplash photos in `mock_data.py` | Real supplier image URLs returned by the AliExpress API. |

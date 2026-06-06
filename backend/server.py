@@ -290,7 +290,7 @@ def apply_sort_and_filters(items, sort_by: str, filter_free: bool, filter_min_re
 # ──────────────────────────────────────────────────────────────────────────────
 @api.get("/")
 async def root():
-    return {"service": "nips-ai-dropshipping-cloud", "status": "ok", "version": "2.9.6-prototype"}
+    return {"service": "nips-ai-dropshipping-cloud", "status": "ok", "version": "2.9.8-prototype"}
 
 
 @api.get("/dashboard/stats")
@@ -308,9 +308,9 @@ async def dashboard_stats():
         },
         "cloud": {
             "status": "connected",
-            "endpoint": "api.nipsau.com",
+            "endpoint": "api.nipsdownloads.com",
             "latency_ms": 87,
-            "version": "2.9.6-prototype",
+            "version": "2.9.8-prototype",
         },
         "counters": {
             "import_drafts": drafts,
@@ -327,7 +327,7 @@ async def license_status():
         "key": "NIPS-ADMIN-LICENSE-0001",
         "valid": True,
         "plan": "Pro",
-        "domain": "demo-store.nipsau.com",
+        "domain": "alloutspares.com",
         "issued_at": "2026-01-12",
         "expires_at": "2099-12-31",
         "features": ["discovery", "import_list", "product_studio", "ai_rewrite", "updates"],
@@ -742,20 +742,38 @@ async def clear_logs():
 # ──────────────────────────────────────────────────────────────────────────────
 PLUGIN_RELEASES = [
     {
-        "version": "2.9.6",
+        "version": "2.9.8",
         "channel": "stable",
         "released_at": "2026-02-12",
-        "notes": "Product Studio draft loader repair. Clean separation between Import List and Studio.",
-        "download_url": "https://updates.nipsau.com/v1/plugin/releases/download?version=2.9.6&license_key=NIPS-ADMIN-LICENSE-0001",
-        "size_kb": 482,
+        "notes": "Image import engine — WebP 800x800 conversion + Media Library dedupe.",
+        "download_url": "https://updates.nipsdownloads.com/v1/plugin/releases/download?version=2.9.8&license_key=NIPS-ADMIN-LICENSE-0001",
+        "size_kb": 498,
         "is_latest": True,
+    },
+    {
+        "version": "2.9.7",
+        "channel": "stable",
+        "released_at": "2026-02-10",
+        "notes": "Publish Product Studio draft to WooCommerce draft product.",
+        "download_url": "https://updates.nipsdownloads.com/v1/plugin/releases/download?version=2.9.7&license_key=NIPS-ADMIN-LICENSE-0001",
+        "size_kb": 489,
+        "is_latest": False,
+    },
+    {
+        "version": "2.9.6",
+        "channel": "stable",
+        "released_at": "2026-02-08",
+        "notes": "Product Studio draft loader repair. Clean separation between Import List and Studio.",
+        "download_url": "https://updates.nipsdownloads.com/v1/plugin/releases/download?version=2.9.6&license_key=NIPS-ADMIN-LICENSE-0001",
+        "size_kb": 482,
+        "is_latest": False,
     },
     {
         "version": "2.9.5",
         "channel": "stable",
         "released_at": "2026-02-05",
         "notes": "Discovery polish, exact URL capture stability.",
-        "download_url": "https://updates.nipsau.com/v1/plugin/releases/download?version=2.9.5&license_key=NIPS-ADMIN-LICENSE-0001",
+        "download_url": "https://updates.nipsdownloads.com/v1/plugin/releases/download?version=2.9.5&license_key=NIPS-ADMIN-LICENSE-0001",
         "size_kb": 471,
         "is_latest": False,
     },
@@ -764,7 +782,7 @@ PLUGIN_RELEASES = [
         "channel": "stable",
         "released_at": "2026-01-28",
         "notes": "Release/update server hardening.",
-        "download_url": "https://updates.nipsau.com/v1/plugin/releases/download?version=2.9.4&license_key=NIPS-ADMIN-LICENSE-0001",
+        "download_url": "https://updates.nipsdownloads.com/v1/plugin/releases/download?version=2.9.4&license_key=NIPS-ADMIN-LICENSE-0001",
         "size_kb": 463,
         "is_latest": False,
     },

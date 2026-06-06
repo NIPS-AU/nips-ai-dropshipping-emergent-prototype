@@ -35,9 +35,10 @@ export default function CloudSettings() {
               <h2 className="font-display text-lg text-slate-900">Cloud connection</h2>
               <Badge className="ml-auto bg-emerald-600 text-white">Online</Badge>
             </div>
-            <Row label="API endpoint" value="https://api.nipsau.com" />
-            <Row label="Updates endpoint" value="https://updates.nipsau.com" />
-            <Row label="Plugin version (prototype)" value="2.9.6-prototype" />
+            <Row label="API endpoint" value="https://api.nipsdownloads.com" />
+            <Row label="Updates endpoint" value="https://updates.nipsdownloads.com" />
+            <Row label="Frontend app" value="https://dropshipping.nips.live" />
+            <Row label="Plugin version (prototype)" value="2.9.8-prototype" />
           </CardContent>
         </Card>
 
@@ -80,7 +81,7 @@ export default function CloudSettings() {
           <ul className="list-disc list-inside space-y-1">
             <li><strong>WordPress plugin</strong> (PHP) on customer site: stores Import List drafts, search history, studio edits, WooCommerce product links.</li>
             <li><strong>NIPS-AI Cloud API</strong> on your VPS (Node.js/Express + PostgreSQL, behind Nginx, Dockerised): license validation, supplier API proxy, AI rewrites, release server.</li>
-            <li><strong>Release server</strong> at <code>updates.nipsau.com</code>: serves plugin ZIPs from <code>/opt/nips-ai-dropshipping-cloud/storage/releases</code>.</li>
+            <li><strong>Release server</strong> at <code>updates.nipsdownloads.com</code>: serves plugin ZIPs from <code>/opt/nips-ai-dropshipping-cloud/storage/releases</code>.</li>
             <li><strong>Customer data</strong> always stays on the WordPress site unless cloud sync is explicitly enabled.</li>
           </ul>
           <p className="pt-2 text-xs text-slate-500">
